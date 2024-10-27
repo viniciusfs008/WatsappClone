@@ -1,6 +1,7 @@
 import os
 
 import requests
+from flask_cors import CORS
 from dotenv import load_dotenv
 from flask import Flask, flash, jsonify, make_response, request, session
 
@@ -16,6 +17,10 @@ from get_ip import get_local_ip
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configuração para permitir solicitações de qualquer origem
+CORS(app)
+
 socketio = SocketIO(app)
 app.config['SECRET_KEY'] = os.urandom(24)
 
@@ -361,10 +366,7 @@ def send_message():
         msg_content = data.get('message')
         msg_type = data.get('type').upper()
 
-        if 'chat' in session:
-            if name != session['chat']:
-                return jsonify({'error': 'Você não se conectou ao chat ainda!'}), 404
-        else:
+        if 'chat' not in session:
             return jsonify({'error': 'Você não se conectou ao chat ainda!'}), 404
 
         # Verifica se todos os dados necessários estão presentes
@@ -373,9 +375,9 @@ def send_message():
 
 
         if msg_type == "QUEUE":
-                friend = User.query.filter_by(username=name).first()
+                friend = User.query.filter_by(username=name.upper()).first()
                 if friend:
-                    friends = Friends.query.filter_by(id_user=user_id, if_friend=friend.id)
+                    friends = Friends.query.filter_by(id_user=user_id, id_friend=friend.id)
                     if friends:
                         
                         query = (
@@ -387,6 +389,8 @@ def send_message():
                                 )
                             )
                         ) 
+
+
                         result = query.first()  # Obtém o primeiro resultado correspondente, ou `None` se não encontrar
                     else:
                         return jsonify({'error': 'Vocês não são amigos'}), 403
@@ -397,6 +401,7 @@ def send_message():
                     return jsonify({'error': 'Você não tem permissão para acessar esse chat ou ele não existe'}), 403
         
                 name = result.name
+                
         elif msg_type == "TOPIC":
             topic = MessageTopic.query.filter_by(group_name=name).first()
             if topic :        
@@ -412,6 +417,8 @@ def send_message():
             return jsonify({'error': 'Tipo de chat inválido! Use QUEUE ou TOPIC.'}), 400
         
 
+        if name != session['chat']:
+            return jsonify({'error': 'Você não se conectou ao chat ainda!'}), 404
 
 
         # Prepara o payload para enviar ao serviço Java, incluindo o username da sessão
@@ -462,6 +469,9 @@ def connect():
     global consumer, status
     data = request.get_json()
 
+    if 'id_user' not in session:
+        return jsonify({"status": "error", "message": "Você não está logado."}), 403
+
     # Validação dos parâmetros da requisição
     if not data or 'name' not in data or 'type' not in data:
         status = "disconnect"
@@ -472,13 +482,14 @@ def connect():
         type = data['type'].upper() 
         
         if type == "QUEUE":
+            
             username = data['name'].upper()
 
-            print(username)
             user = User.query.filter_by(username=username).first()
             if not user:
                 return jsonify({"status": "error", "message": "Amigo não encontrado."}), 404
             
+            # Executa a consulta corretamente
             query = (
                 db.session.query(LinkQueue)
                 .filter(
@@ -488,10 +499,13 @@ def connect():
                     )
                 )
             ) 
-            result = query.first()  
+            result = query.first()
+
+            
             if not result:
                 return jsonify({"status": "error", "message": "Chat não encontrado."}), 404
             
+            # Certifique-se de que a coluna name exista
             name = result.name
 
         elif type == "TOPIC":
@@ -504,7 +518,7 @@ def connect():
         
         RECEIVE_URL = Flask_URL+"/"+name
 
-        session['chat'] = data['name']
+        session['chat'] = name
 
         print(f'name: {name}')
 
@@ -532,6 +546,99 @@ def connect():
         status = "disconnect"
         return jsonify({"status": "error", "message": f"Erro no processamento. {ex}"}), 500
 
+
+@app.route('/load_messages', methods=['POST'])
+def load_messages():
+    data = request.get_json()
+
+    if 'chat' not in session:
+        return jsonify({'status': 'error', 'message': 'Você não se conectou a nenhum chat'}), 400
+            
+
+    if not data or 'type' not in data:
+        status = "disconnect"
+        return jsonify({"status": "error", "message": "Todos os campos (type) devem ser fornecido."}), 400
+
+    user = session['id_user']
+
+    type = data.get('type').upper()
+    
+
+    if 'name' in data:
+        if type == 'QUEUE':
+            return jsonify({"status": "error", "message": "parametro (name) devem ser fornecido apenas em requisiçao TOPIC."}), 400
+        name = data.get('name')
+    if 'friend' in data:
+        if type != 'QUEUE':
+            return jsonify({"status": "error", "message": "Erro requisição na requisição este tipo de requisição deve ser QUEUE!"}), 400
+        
+        friend = data.get('friend').upper()
+    
+    try:
+        if type == 'QUEUE':
+            guy = User.query.filter_by(username=friend)
+            if not friend:
+                return jsonify({'status': 'error', 'message': 'Amigo não encontrado.'}), 404
+            
+            query = (
+                db.session.query(LinkQueue)
+                .filter(
+                    or_(
+                        (LinkQueue.user_one == user) & (LinkQueue.user_two == guy.id),
+                        (LinkQueue.user_two == user) & (LinkQueue.user_one == guy.id)
+                    )
+                )
+            ) 
+            result = query.first()  
+
+            if not result:
+                return jsonify({'status': 'error', 'message': 'Chat não encontrado.'}), 404
+
+            if session['chat'] != result.name:
+                return jsonify({'status': 'error', 'message': 'Sala inválida.'}), 400
+            
+            messages = (
+                db.session.query(MessageQueue.id, GroupMessage.message, MessageQueue.timestamp, User.username)  # Incluindo username
+                .join(User, MessageQueue.sender_id == User.id)  # Realiza a junção
+                .filter(MessageQueue.queue_name == result.name)  # Filtra
+                .order_by(MessageQueue.timestamp)  # Ordena
+                .all()  # Executa a consulta
+            )
+
+            if not result:
+                return jsonify({'status': 'error', 'message': 'Chat não encontrado.'}), 404
+        elif type == 'TOPIC':
+            group_name = name
+            topic = MessageTopic.query.filter_by(group_name=group_name).first()
+            if not topic:
+                return jsonify({"status": "error", "message": "Chat em grupo não encontrado."}), 404
+            
+            member = TopicMembership.query.filter_by(topic_id=topic.name, user_id=user).first()
+
+            if not member:
+                return jsonify({'status': 'error', 'message': 'Você não é membro deste chat.'}), 404
+            
+            name = topic.name
+            # Supondo que 'name' seja o ID do tópico que você está filtrando
+            # Consulta para pegar as mensagens, agora incluindo o username
+            messages = (
+                db.session.query(GroupMessage.id, GroupMessage.message, GroupMessage.timestamp, User.username)  # Incluindo username
+                .join(User, GroupMessage.sender_id == User.id)  # Realiza a junção
+                .filter(GroupMessage.topic_id == name)  # Filtra
+                .order_by(GroupMessage.timestamp)  # Ordena
+                .all()  # Executa a consulta
+            )
+        else:
+            return jsonify({'status': 'error', 'message': 'Tipo de chat inválido.'}), 400
+
+                    # Formata os resultados
+        result = [{'id': message.id, 'message': message.message, 'timestamp': message.timestamp, 'username': message.username} for message in messages]
+
+        return jsonify({'status': 'success', 'messages': result}), 200
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Erro de processamento: {e}'}), 400
+    
 
 @app.route('/messages/<value>', methods=['POST'])
 def receive_message(value):

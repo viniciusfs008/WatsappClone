@@ -61,7 +61,6 @@ class LinkQueue(db.Model):
     __tablename__ = 'link_queue'
 
     name = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    queue_name = db.Column(db.String(100), unique=True, nullable=False)
     user_one = db.Column(db.String(36), db.ForeignKey('User.id'), nullable=False)
     user_two = db.Column(db.String(36), db.ForeignKey('User.id'), nullable=False) 
 
