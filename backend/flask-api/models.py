@@ -1,7 +1,8 @@
 import uuid
 
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, and_, or_
+from sqlalchemy.orm import joinedload
+from sqlalchemy import text, and_, or_, distinct
 from werkzeug.security import generate_password_hash
 
 
@@ -74,6 +75,9 @@ class MessageQueue(db.Model):
     timestamp = db.Column(db.DateTime, default=db.func.current_timestamp(), nullable=False)  # Timestamp da mensagem
     message = db.Column(db.Text, nullable=False)  # Conteúdo da mensagem
     is_read = db.Column(db.Boolean, default=False)  # Status de leitura da mensagem
+
+    # Definindo o relacionamento com a tabela User
+    sender = db.relationship('User', backref='messages')
 
     def __init__(self, queue_name, sender_id, message):
         self.queue_name = queue_name
@@ -306,6 +310,78 @@ def create_triggers(db):
             FOR EACH ROW
             EXECUTE FUNCTION add_mutual_friend();
         '''))
+
+
+        # Remover a view se ela já existir
+        session.execute(text('DROP VIEW IF EXISTS v_message_queue;'))
+
+        # Criar a view
+        session.execute(text('''
+            CREATE OR REPLACE VIEW v_message_queue AS
+            SELECT 
+                mq.id,
+                mq.message,
+                mq.timestamp,
+                u.username,
+                mq.queue_name  -- Certifique-se de incluir queue_name na view
+            FROM 
+                message_queue mq
+            JOIN 
+                "User" u ON mq.sender_id = u.id;
+        '''))
+
+        # Remover a view se ela já existir
+        session.execute(text('DROP VIEW IF EXISTS user_queue_info;'))
+
+
+        session.execute(text('''
+        CREATE OR REPLACE VIEW user_queue_info AS
+        SELECT 
+            u.username AS user_username,
+            lq.name AS queue_name,
+            mq.message AS last_message,
+            mq.timestamp AS last_message_timestamp,
+            CASE 
+                WHEN u.id = lq.user_one THEN u2.username  -- Se o usuário for user_one, pegar o username do user_two
+                ELSE u.username  -- Caso contrário, pegar o próprio username
+            END AS friend_name
+        FROM 
+            "User" u
+        JOIN 
+            link_queue lq ON u.id = lq.user_one OR u.id = lq.user_two
+        LEFT JOIN 
+            last_message_queue lmq ON lq.name = lmq.id_from
+        LEFT JOIN 
+            message_queue mq ON lmq.id_last_message = mq.id
+        LEFT JOIN 
+            "User" u2 ON (u2.id = lq.user_one OR u2.id = lq.user_two) AND u2.id != u.id;  -- Juntar novamente para pegar o outro usuário
+
+        '''))
+
+        # Remover a view se ela já existir
+        session.execute(text('DROP VIEW IF EXISTS user_topic_info;'))
+
+
+        session.execute(text('''
+        CREATE OR REPLACE VIEW user_topic_info AS
+        SELECT 
+            u.username AS user_username,
+            mt.group_name AS topic_name,
+            gm.message AS last_message,
+            gm.timestamp AS last_message_timestamp
+        FROM 
+            "User" u
+        JOIN 
+            topic_membership tm ON u.id = tm.user_id
+        JOIN 
+            message_topic mt ON tm.topic_id = mt.name
+        LEFT JOIN 
+            last_message_topic lmt ON mt.name = lmt.id_from
+        LEFT JOIN 
+            group_message gm ON lmt.id_last_message = gm.id;
+
+        '''))
+
 
         # Confirmar a transação
         session.commit()

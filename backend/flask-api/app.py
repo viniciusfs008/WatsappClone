@@ -1,5 +1,5 @@
 import os
-
+import json
 import requests
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -9,7 +9,9 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import (GroupMessage,  # Importa o banco e as classes de modelo
-                    MessageQueue, MessageTopic, TopicMembership, Friends, User, FriendList, LinkQueue, db, create_triggers, and_, or_)
+                    MessageQueue, MessageTopic, TopicMembership, Friends,
+                    User, FriendList, LinkQueue, db, create_triggers, 
+                    and_, or_, distinct, joinedload, text)
 
 from get_ip import get_local_ip
 
@@ -221,9 +223,86 @@ def login():
                 session['id_user'] = user.id
                 user.is_online = True  # Define is_online como True
                 db.session.commit()  # Salva a alteração no banco de dados
-                flash('Login bem-sucedido!')  # Mensagem de sucesso
+                
+                query_queue = f"""
+                SELECT 
+                    u.username AS user_username,
+                    lq.name AS queue_name,
+                    mq.message AS last_message,
+                    mq.timestamp AS last_message_timestamp,
+                    CASE 
+                        WHEN u.id = lq.user_one THEN u2.username  -- Se o usuário for user_one, pegar o username do user_two
+                        ELSE u.username  -- Caso contrário, pegar o próprio username
+                    END AS friend_name
+                FROM 
+                    "User" u
+                JOIN 
+                    link_queue lq ON u.id = lq.user_one OR u.id = lq.user_two
+                LEFT JOIN 
+                    last_message_queue lmq ON lq.name = lmq.id_from
+                LEFT JOIN 
+                    message_queue mq ON lmq.id_last_message = mq.id
+                LEFT JOIN 
+                    "User" u2 ON (u2.id = lq.user_one OR u2.id = lq.user_two) AND u2.id != u.id  -- Juntar novamente para pegar o outro usuário
+                WHERE 
+                    u.id = '{user.id}';
+                """
+                # Executa a consulta na view e converte para uma lista de dicionários
+                results_queue = db.session.execute(text(query_queue)).fetchall()
+
+                query_topic = f"""
+                SELECT 
+                    u.username AS user_username,
+                    mt.group_name AS topic_name,
+                    gm.message AS last_message,
+                    gm.timestamp AS last_message_timestamp
+                FROM 
+                    "User" u
+                JOIN 
+                    topic_membership tm ON u.id = tm.user_id
+                JOIN 
+                    message_topic mt ON tm.topic_id = mt.name
+                LEFT JOIN 
+                    last_message_topic lmt ON mt.name = lmt.id_from
+                LEFT JOIN 
+                    group_message gm ON lmt.id_last_message = gm.id
+                WHERE 
+                    u.id = '{user.id}'; 
+                """
+                # Executa a consulta na view e converte para uma lista de dicionários
+                results_topic = db.session.execute(text(query_topic)).fetchall()
+
+
+                print(results_topic)
+                print(results_queue)
+
+                # Criar uma lista para os chats
+                chats = []
+
+                # Adicionar resultados da consulta de filas
+                for user_username, topic_name, last_message, timestamp in results_topic:
+                    chats.append({
+                        #'user_username': user_username,
+                        'topic_name': topic_name,
+                        'last_message': last_message,
+                        #'timestamp': timestamp.isoformat()  # Converter para string
+                    })
+
+                # Adicionar resultados da consulta de tópicos
+                for user_username, queue_name, last_message, timestamp, friend_name in results_queue:
+                    chats.append({
+                        #'user_username': user_username,
+                        'queue_name': queue_name,
+                        'last_message': last_message,
+                        #'timestamp': timestamp.isoformat() if timestamp else None,  # Converter para string ou None
+                        'friend_name': friend_name
+                    })
+
+
+           
+                print(chats)
                 return make_response(
-                    jsonify({'message': 'Login bem-sucedido!'}), 200
+                    jsonify({'message': chats}), 200
                 )
             else:
                 flash('Usuário ou senha incorretos.')
@@ -508,6 +587,15 @@ def connect():
             # Certifique-se de que a coluna name exista
             name = result.name
 
+            query = f"""
+            SELECT * FROM v_message_queue
+            WHERE queue_name = '{result.name}'
+            ORDER BY timestamp;
+            """
+            messages = db.session.execute(text(query)).fetchall()  # Executa a consulta na view
+            
+
+
         elif type == "TOPIC":
             group_name = data['name']
             topic = MessageTopic.query.filter_by(group_name=group_name).first()
@@ -515,6 +603,14 @@ def connect():
                 return jsonify({"status": "error", "message": "Chat em grupo não encontrado."}), 404
             
             name = topic.name
+
+            messages = (
+                db.session.query(GroupMessage.id, GroupMessage.message, GroupMessage.timestamp, User.username)  # Incluindo username
+                .join(User, GroupMessage.sender_id == User.id)  # Realiza a junção
+                .filter(GroupMessage.topic_id == name)  # Filtra
+                .order_by(GroupMessage.timestamp)  # Ordena
+                .all()  # Executa a consulta
+            )
         
         RECEIVE_URL = Flask_URL+"/"+name
 
@@ -537,7 +633,8 @@ def connect():
 
         # Retorna a resposta do serviço Java
         if response.status_code == 200:
-            return jsonify({"status": "success", "message": "Conectado com sucesso."}), 200
+            result = [{'id': message.id, 'message': message.message, 'timestamp': message.timestamp, 'username': message.username} for message in messages]
+            return jsonify({'status': 'success', 'messages': result}), 200
         else:
             status = "disconnect"
             return jsonify({'error': f'Falha ao enviar mensagem: {response.text}'}), response.status_code
@@ -545,6 +642,12 @@ def connect():
     except Exception as ex:
         status = "disconnect"
         return jsonify({"status": "error", "message": f"Erro no processamento. {ex}"}), 500
+
+
+@app.route('/load_chats', methods=['POST'])
+def load_chats():
+    data = request.get_json()
+
 
 
 @app.route('/load_messages', methods=['POST'])
@@ -576,7 +679,8 @@ def load_messages():
     
     try:
         if type == 'QUEUE':
-            guy = User.query.filter_by(username=friend)
+            friend = User.query.filter_by(username=friend).first()
+
             if not friend:
                 return jsonify({'status': 'error', 'message': 'Amigo não encontrado.'}), 404
             
@@ -584,8 +688,8 @@ def load_messages():
                 db.session.query(LinkQueue)
                 .filter(
                     or_(
-                        (LinkQueue.user_one == user) & (LinkQueue.user_two == guy.id),
-                        (LinkQueue.user_two == user) & (LinkQueue.user_one == guy.id)
+                        (LinkQueue.user_one == user) & (LinkQueue.user_two == friend.id),
+                        (LinkQueue.user_two == user) & (LinkQueue.user_one == friend.id)
                     )
                 )
             ) 
@@ -597,13 +701,13 @@ def load_messages():
             if session['chat'] != result.name:
                 return jsonify({'status': 'error', 'message': 'Sala inválida.'}), 400
             
-            messages = (
-                db.session.query(MessageQueue.id, GroupMessage.message, MessageQueue.timestamp, User.username)  # Incluindo username
-                .join(User, MessageQueue.sender_id == User.id)  # Realiza a junção
-                .filter(MessageQueue.queue_name == result.name)  # Filtra
-                .order_by(MessageQueue.timestamp)  # Ordena
-                .all()  # Executa a consulta
-            )
+            query = f"""
+            SELECT * FROM v_message_queue
+            WHERE queue_name = '{result.name}'
+            ORDER BY timestamp;
+            """
+            messages = db.session.execute(text(query)).fetchall()  # Executa a consulta na view
+            
 
             if not result:
                 return jsonify({'status': 'error', 'message': 'Chat não encontrado.'}), 404
