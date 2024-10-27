@@ -1,6 +1,7 @@
 import os
 
 import requests
+from flask_cors import CORS
 from dotenv import load_dotenv
 from flask import Flask, flash, jsonify, make_response, request, session
 
@@ -16,6 +17,10 @@ from get_ip import get_local_ip
 load_dotenv()
 
 app = Flask(__name__)
+
+# Configuração para permitir solicitações de qualquer origem
+CORS(app)
+
 socketio = SocketIO(app)
 app.config['SECRET_KEY'] = os.urandom(24)
 

@@ -8,3 +8,4 @@ psycopg2
 blue
 isort
 flask_socketio
+flask_cors
