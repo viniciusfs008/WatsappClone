@@ -1,0 +1,10 @@
+Flask
+requests
+python-dotenv
+Flask-SQLAlchemy==3.1.1
+SQLAlchemy==2.0.35
+Werkzeug
+psycopg2
+blue
+isort
+flask_socketio
