@@ -300,11 +300,12 @@ def login():
                         'friend_name': friend_name
                     })
 
-
-           
                 print(chats)
+
+                info = ({'id_user': user.id, 'username': user.username})
+
                 return make_response(
-                    jsonify({'message': chats}), 200
+                    jsonify({'message': chats, 'session': info}), 200
                 )
             else:
                 flash('Usuário ou senha incorretos.')
@@ -321,13 +322,19 @@ def login():
 from flask import request, session, jsonify, make_response
 @app.route('/create_group', methods=['POST'])
 def create_group():
+
+    data = request.get_json()
+
+    session['id_user'] = data['id_user']
+    session['username'] = data['username']
+
     # Verifica se o usuário está logado
     if 'id_user' not in session:
         return make_response(jsonify({'error': 'Você precisa estar logado para criar grupos.'}), 401)
 
     # Extrai o ID do usuário e os dados do JSON
     user_id = session['id_user']
-    data = request.get_json()
+    
 
     # Validação dos parâmetros
     if not data or 'amigos' not in data or 'group_name' not in data:
@@ -387,11 +394,18 @@ def create_group():
 
 @app.route('/add_friend', methods=['POST'])
 def add_friend():
+
+    data = request.get_json()
+
+    session['id_user'] = data['id_user']
+    session['username'] = data['username']
+
+
     if 'id_user' not in session:
         return make_response(jsonify({'error': 'Você precisa estar logado para adicionar amigos.'}), 401)
 
     try:
-        data = request.get_json()
+        
 
         if 'friend_username' not in data:
             return make_response(jsonify({'error': 'Nome de usuário do amigo é necessário.'}), 400)
@@ -428,8 +442,14 @@ def add_friend():
 
 @app.route('/send_message', methods=['POST'])
 def send_message():
+
+    data = request.get_json()
+
+    session['id_user'] = data['id_user']
+    session['username'] = data['username']
+
     # Verifica se o usuário está logado
-    if 'username' not in session:
+    if 'id_user' not in session:
         return jsonify({'error': 'Acesso negado: usuário não autenticado.'}), 403
 
     try:
@@ -441,7 +461,7 @@ def send_message():
         broker_url = BROKER_URL        
 
         # Obtém os dados do JSON recebido
-        data = request.get_json()
+        
 
         name = data.get('name')
         msg_content = data.get('message')
@@ -550,6 +570,9 @@ def connect():
     global consumer, status
     data = request.get_json()
 
+    session['id_user'] = data['id_user']
+    session['username'] = data['username']
+
     if 'id_user' not in session:
         return jsonify({"status": "error", "message": "Você não está logado."}), 403
 
@@ -636,7 +659,9 @@ def connect():
         # Retorna a resposta do serviço Java
         if response.status_code == 200:
             result = [{'id': message.id, 'message': message.message, 'timestamp': message.timestamp, 'username': message.username} for message in messages]
-            return jsonify({'status': 'success', 'messages': result}), 200
+            
+            info = ({'id_user': session['id_user'], 'username': session['username']})
+            return jsonify({'status': 'success', 'messages': result, "session": info}), 200
         else:
             status = "disconnect"
             return jsonify({'error': f'Falha ao enviar mensagem: {response.text}'}), response.status_code
@@ -644,11 +669,6 @@ def connect():
     except Exception as ex:
         status = "disconnect"
         return jsonify({"status": "error", "message": f"Erro no processamento. {ex}"}), 500
-
-
-@app.route('/load_chats', methods=['POST'])
-def load_chats():
-    data = request.get_json()
 
 
 
