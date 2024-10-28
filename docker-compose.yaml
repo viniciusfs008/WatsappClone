@@ -11,21 +11,21 @@ services:
     networks:
       - mynetwork
     
-  flask_app:
-    container_name: flask_app
-    image: flask_live_app:1.0.0
-    build:
-      context: ./backend/flask-api
-      dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
-    environment:
-      - DB_URL=postgresql://postgres:postgres@192.168.0.110:5432/postgres
-      - HOST_IP=192.168.0.113
-    # depends_on:
-    #   - flask_db
-    networks:
-      - mynetwork
+  # flask_app:
+  #   container_name: flask_app
+  #   image: flask_live_app:1.0.0
+  #   build:
+  #     context: ./backend/flask-api
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "5000:5000"
+  #   environment:
+  #     - DB_URL=postgresql://postgres:postgres@192.168.0.110:5432/postgres
+  #     - HOST_IP=192.168.0.113
+  #   # depends_on:
+  #   #   - flask_db
+  #   networks:
+  #     - mynetwork
 
   # flask_db:
   #   container_name: flask_db

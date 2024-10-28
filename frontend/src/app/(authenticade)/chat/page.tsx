@@ -2,12 +2,7 @@
 
 import ThemeSwitcher from "@/components/my/theme-switch";
 import { SendHorizontal } from "lucide-react";
-
 import { useEffect, useState } from "react";
-
-// import css
-import "./style.css";
-
 import {
   Sidebar,
   SidebarContent,
@@ -29,12 +24,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@radix-ui/react-avatar";
 import { AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Gruppo } from "next/font/google";
 import { fetchDataPost } from "@/controler/controler";
+import { io, Socket } from "socket.io-client";
 
 interface Message {
   id: number;
@@ -58,9 +52,18 @@ export default function Chat() {
   const [items, setItems] = useState<
     { nome: string; msg: string; url: string }[]
   >([]);
+  const [dest, setDest] = useState<string>();
+  const [type, setType] = useState<string>();
+  const [chat, setChat] = useState<string>();
+  const [sessao, setSessao] = useState<Session>();
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-  // Estado para o usuário
-  const [sessao, setSessao] = useState<{ username: string; id_user: string }>();
+  const [conversa, setConversa] = useState<Conversa>({
+    messages: [],
+    session: { id_user: "", username: "" },
+    status: "",
+  });
+  const [inputValue, setInputValue] = useState("");
 
   useEffect(() => {
     const storedMessages = localStorage.getItem("messages");
@@ -71,77 +74,88 @@ export default function Chat() {
     }
   }, []);
 
-  // Estado para a conversa atual, inicializado corretamente
-  const [conversa, setConversa] = useState<Conversa>({
-    messages: [],
-    session: { id_user: "", username: "" },
-    status: "",
-  });
+  useEffect(() => {
+    if (dest && sessao && chat) {
+      const newSocket = io("http://192.168.0.110:5000");
 
-  // Estado para armazenar o valor do input
-  const [inputValue, setInputValue] = useState("");
+      // Conecta e entra na sala
+      newSocket.emit("join", { room: chat, username: sessao.username });
 
-  // Função para adicionar nova mensagem
-  const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault(); // Previne o recarregamento da página ao enviar o formulário
+      // Configura o listener para novas mensagens
+      newSocket.on("new_message", (data: Message) => {
+        setConversa((prevConversa) => ({
+          ...prevConversa,
+          messages: [...prevConversa.messages, data],
+        }));
+      });
 
-    if (inputValue.trim()) {
+      setSocket(newSocket);
+
+      // Cleanup: sair da sala e desconectar
+      return () => {
+        newSocket.emit("leave", { room: chat });
+        newSocket.disconnect();
+      };
+    }
+  }, [dest, sessao, chat]);
+
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (inputValue.trim() && sessao) {
       const newMessage: Message = {
-        id: Date.now(), // Pode usar um ID único, como um timestamp
+        id: Date.now(),
         message: inputValue,
         timestamp: new Date().toISOString(),
-        username: sessao?.username || "",
+        username: sessao.username,
       };
 
-      // Adiciona a nova mensagem no estado da conversa
-      setConversa((prevConversa) => ({
-        ...prevConversa,
-        messages: [...prevConversa.messages, newMessage],
-      }));
-
-      // Limpa o input
-      setInputValue("");
+      try {
+        await fetchDataPost("/send_message", {
+          name: dest,
+          message: newMessage.message,
+          id_user: sessao.id_user,
+          username: sessao.username,
+          type: type,
+          chat: chat,
+        });
+        
+        setInputValue("");
+      } catch (error) {
+        console.error("Erro ao enviar mensagem:", error);
+      }
     }
   };
 
-  function iniciaChat(nome: string) {
-    // Inicializa os parâmetros como um objeto vazio
-    let params:
-      | { name: string; type: string; id_user?: string; username?: string }
-      | undefined;
+  const iniciaChat = (nome: string) => {
+    setDest(nome);
 
-    // Itera sobre os itens para determinar o tipo e o nome
-    items.forEach((item) => {
-      if (item.nome === nome) {
-        params = {
-          name: nome,
-          type: item.url === null ? "TOPIC" : "QUEUE",
-          id_user: sessao?.id_user,
-          username: sessao?.username,
-        };
-      }
-    });
-    console.log(params);
-    // Verifica se params foi definido antes de fazer a requisição
-    if (params) {
+    const item = items.find((i) => i.nome === nome);
+    if (item) {
+      const tipo = item.url === null ? "TOPIC" : "QUEUE";
+      setType(tipo);
+
+      const params = {
+        name: nome,
+        type: tipo,
+        id_user: sessao?.id_user,
+        username: sessao?.username,
+      };
+
       fetchDataPost("/connect", params)
         .then((response) => {
           setConversa({
             messages: response?.data?.messages || [],
-            session: {
-              id_user: sessao?.id_user || "",
-              username: sessao?.username || "",
-            },
-            status: response?.data?.status || "", // ajuste conforme necessário
+            session: sessao || { id_user: "", username: "" },
+            status: response?.data?.status || "",
           });
+          setChat(response?.data?.session.chat || "");
         })
         .catch((error) => {
           console.error("Erro ao iniciar o chat:", error);
         });
-    } else {
-      console.error("Nome não encontrado nos itens.");
     }
-  }
+  };
 
   return (
     <SidebarProvider>
@@ -207,14 +221,14 @@ export default function Chat() {
           <Avatar className="h-10 w-10 flex items-center justify-center dark:bg-slate-600 bg-slate-300 rounded-full">
             <AvatarImage src="" />
             <AvatarFallback className="font-bold">
-              {conversa.name
-                .split(" ")
+              {dest
+                ?.split(" ")
                 .slice(0, 2)
                 .map((word) => word[0])
                 .join("")}
             </AvatarFallback>
           </Avatar>
-          <h2 className="ps-2 font-semibold text-lg">{conversa.dest}</h2>
+          <h2 className="ps-2 font-semibold text-lg">{dest}</h2>
         </header>
         <main className="bg-muted w-full h-[84vh]">
           <ScrollArea className="w-full h-[84vh] rounded-md border p-4">
@@ -229,13 +243,14 @@ export default function Chat() {
                   }`}
                 >
                   <div
-                    className={`p-3 rounded-lg max-w-2xl break-words ${
+                    className={`p-3 rounded-lg max-w-2xl break-words flex flex-col ${
                       item.username === sessao?.username
                         ? "dark:bg-slate-600 bg-slate-300"
                         : "dark:bg-slate-700 bg-slate-200"
                     }`}
                   >
-                    <span>{item.message}</span>
+                    <span className=" font-semibold capitalize">{item.username}</span>
+                    <span className=" text-muted-foreground">{item.message}</span>
                   </div>
                 </div>
               ))
