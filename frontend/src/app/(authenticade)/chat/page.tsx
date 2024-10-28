@@ -35,9 +35,12 @@ import { AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Gruppo } from "next/font/google";
 import { group } from "console";
+import { fetchDataPost } from "@/controler/controler";
 
 export default function Chat() {
-  const [items, setItems] = useState<{ nome: string; msg: string }[]>([]);
+  const [items, setItems] = useState<
+    { nome: string; msg: string; url: string }[]
+  >([]);
 
   useEffect(() => {
     const storedMessages = localStorage.getItem("messages");
@@ -76,6 +79,36 @@ export default function Chat() {
     }
   };
 
+  function iniciaChat(nome: string) {
+    // Inicializa os parâmetros como um objeto vazio
+    let params: { name: string; type: string } | undefined;
+
+    // Itera sobre os itens para determinar o tipo e o nome
+    items.forEach((item) => {
+      if (item.nome === nome) {
+        params = {
+          name: nome,
+          type: item.url === "" ? "topic" : "queue",
+        };
+      }
+    });
+
+    // Verifica se params foi definido antes de fazer a requisição
+    if (params) {
+      fetchDataPost("/connect", params)
+        .then((response) => {
+          // Lide com a resposta da requisição aqui
+          console.log("Chat iniciado com sucesso:", response);
+        })
+        .catch((error) => {
+          // Lide com qualquer erro que ocorra na requisição
+          console.error("Erro ao iniciar o chat:", error);
+        });
+    } else {
+      console.error("Nome não encontrado nos itens.");
+    }
+  }
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -100,7 +133,10 @@ export default function Chat() {
                               key={item.nome}
                               value={item.nome}
                             >
-                              <a className="h-[64px]">
+                              <a
+                                className="h-[64px]"
+                                onClick={() => iniciaChat(item.nome)}
+                              >
                                 <Avatar className="h-10 w-10 flex items-center justify-center dark:bg-slate-600 bg-slate-300 rounded-full">
                                   <AvatarImage src="" />
                                   <AvatarFallback className="font-bold">

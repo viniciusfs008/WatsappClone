@@ -79,13 +79,13 @@ export default function Login() {
             // Filtra os dados que você deseja armazenar
             const filteredMessages = response.data.message
               .map((msg: any) => {
-                if (msg.topic_name && msg.last_message) {
+                if (msg.topic_name) {
                   return {
                     nome: msg.topic_name,
                     msg: msg.last_message,
                     url: null,
                   };
-                } else if (msg.friend_name && msg.last_message) {
+                } else if (msg.friend_name) {
                   return {
                     nome: msg.friend_name,
                     msg: msg.last_message,
