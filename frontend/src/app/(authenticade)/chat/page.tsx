@@ -1,9 +1,7 @@
 "use client";
 
 import ThemeSwitcher from "@/components/my/theme-switch";
-import {
-  SendHorizontal,
-} from "lucide-react";
+import { SendHorizontal } from "lucide-react";
 
 import { useEffect, useState } from "react";
 
@@ -39,62 +37,20 @@ import { Gruppo } from "next/font/google";
 import { group } from "console";
 
 export default function Chat() {
-  // Estado para os itens do menu
-  const [items, setItems] = useState([
-    {
-      nome: "Vinicius Ferrari",
-      msg: "Oi, tudo bem?",
-      url: "#",
-    },
-    {
-      nome: "Anthony Muniz",
-      msg: "Oi, tudo bem?",
-      url: "#",
-    },
-    {
-      nome: "Vinicius Oliveira",
-      msg: "Oi, tudo bem?",
-      url: "#",
-    },
-    {
-      nome: "Bruno Pazzarro",
-      msg: "Oi, tudo bem?",
-      url: "#",
-    },
-    {
-      nome: "Grupo 1",
-      msg: "Teste",
-      url: "#",
-    },
-  ]);
+  const [items, setItems] = useState<{ nome: string; msg: string }[]>([]);
+
+  useEffect(() => {
+    const storedMessages = localStorage.getItem("messages");
+    if (storedMessages) {
+      setItems(JSON.parse(storedMessages));
+    }
+  }, []);
 
   // Estado para a conversa atual
-  const [conversa, setConversa] = useState({
-    // group: "",
-    // dest: ["Bruno Pazzarro"],
-    dest: "Bruno Pazzarro",
-    messages: [
-      {
-        nome: "Bruno Pazzarro",
-        msg: "Oi, tudo bem?",
-      },
-      {
-        nome: "Vinicius Ferrari",
-        msg: "Oi, estou bem e vc?",
-      },
-      {
-        nome: "Vinicius Ferrari",
-        msg: "como anda por ai?",
-      },
-      {
-        nome: "Vinicius Ferrari",
-        msg: "aaaaaaaaaaaaewibfewbfeiwubfeiwbfiuewefbweiufbiewubfiewbfiewfbewiufweiufbwebfibweifbweifbweiubfiewbfiwebfiwebfw",
-      },
-    ],
-  });
+  // const [conversa, setConversa] = useState();
 
   // Estado para o usuário
-  const [user, setUser] = useState({ nome: "Vinicius Ferrari" });
+  const [user, setUser] = useState(localStorage.getItem("username"));
 
   // Estado para armazenar o valor do input
   const [inputValue, setInputValue] = useState("");
@@ -105,15 +61,15 @@ export default function Chat() {
 
     if (inputValue.trim()) {
       const newMessage = {
-        nome: user.nome,
+        nome: user,
         msg: inputValue,
       };
 
       // Adiciona a nova mensagem no estado da conversa
-      setConversa((prevConversa) => ({
-        ...prevConversa,
-        messages: [...prevConversa.messages, newMessage],
-      }));
+      // setConversa((prevConversa) => ({
+      //   ...prevConversa,
+      //   messages: [...prevConversa.messages, newMessage],
+      // }));
 
       // Limpa o input
       setInputValue("");
@@ -144,7 +100,7 @@ export default function Chat() {
                               key={item.nome}
                               value={item.nome}
                             >
-                              <a href={item.url} className="h-[64px]">
+                              <a className="h-[64px]">
                                 <Avatar className="h-10 w-10 flex items-center justify-center dark:bg-slate-600 bg-slate-300 rounded-full">
                                   <AvatarImage src="" />
                                   <AvatarFallback className="font-bold">
@@ -176,7 +132,7 @@ export default function Chat() {
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      <div className="w-full h-screen flex flex-col">
+      {/* <div className="w-full h-screen flex flex-col">
         <header className="h-[8vh] w-full bg-background p-3 flex items-center border-b">
           <Avatar className="h-10 w-10 flex items-center justify-center dark:bg-slate-600 bg-slate-300 rounded-full">
             <AvatarImage src="" />
@@ -231,7 +187,7 @@ export default function Chat() {
             </button>
           </form>
         </footer>
-      </div>
+      </div> */}
     </SidebarProvider>
   );
 }

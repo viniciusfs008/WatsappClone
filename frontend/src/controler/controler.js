@@ -19,7 +19,7 @@ export async function fetchDataPost(rota, data) {
   try {
     // console.log("Enviando dados para a rota: " + rota);
     // console.log(data);
-    console.log(`http://${host}:${port}${rota}`);
+    // console.log(`http://${host}:${port}${rota}`);
     const response = await axios.post(
       `http://${host}:${port}${rota}`,
       data,

@@ -64,18 +64,42 @@ export default function Login() {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
+    const username = formData.get("username");
     const params = {
-      username: formData.get("username"),
+      username: username,
       password: formData.get("password"),
     };
 
     // Chama a função para enviar dados de login
     fetchDataPost("/login", params)
       .then((response) => {
-        console.log(response);
         // Supondo que o login seja bem-sucedido, redirecione para a página de chat
         if (response?.status === 200) {
-          router.push("/chat"); // Redireciona para a página de chat
+          if (username) {
+            // Filtra os dados que você deseja armazenar
+            const filteredMessages = response.data.message
+              .map((msg: any) => {
+                if (msg.topic_name && msg.last_message) {
+                  return {
+                    nome: msg.topic_name,
+                    msg: msg.last_message,
+                    url: null,
+                  };
+                } else if (msg.friend_name && msg.last_message) {
+                  return {
+                    nome: msg.friend_name,
+                    msg: msg.last_message,
+                    url: msg.queue_name,
+                  };
+                }
+                return null; // Ignora itens sem os campos desejados
+              })
+              .filter(Boolean); // Remove qualquer null do array
+              
+            localStorage.setItem("messages", JSON.stringify(filteredMessages));
+            localStorage.setItem("username", JSON.stringify(username));
+          }
+          router.push("/chat");
         } else {
           toast.error("Usuario ou Senha incorretos. Tente novamente.", {
             position: "top-right", // Posição do toast
