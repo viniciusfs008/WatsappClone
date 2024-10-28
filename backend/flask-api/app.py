@@ -231,8 +231,8 @@ def login():
                     mq.message AS last_message,
                     mq.timestamp AS last_message_timestamp,
                     CASE 
-                        WHEN u.id = lq.user_one THEN u2.username  -- Se o usuário for user_one, pegar o username do user_two
-                        ELSE u.username  -- Caso contrário, pegar o próprio username
+                        WHEN u.id = lq.user_one THEN u2.username  -- Captura o nome do amigo se o usuário for 'user_one'
+                        ELSE u1.username  -- Captura o nome do amigo se o usuário for 'user_two'
                     END AS friend_name
                 FROM 
                     "User" u
@@ -243,7 +243,9 @@ def login():
                 LEFT JOIN 
                     message_queue mq ON lmq.id_last_message = mq.id
                 LEFT JOIN 
-                    "User" u2 ON (u2.id = lq.user_one OR u2.id = lq.user_two) AND u2.id != u.id  -- Juntar novamente para pegar o outro usuário
+                    "User" u1 ON u1.id = lq.user_one  -- Amigo potencial, se `user_one`
+                LEFT JOIN 
+                    "User" u2 ON u2.id = lq.user_two  -- Amigo potencial, se `user_two`
                 WHERE 
                     u.id = '{user.id}';
                 """
