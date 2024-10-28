@@ -95,9 +95,9 @@ export default function Login() {
                 return null; // Ignora itens sem os campos desejados
               })
               .filter(Boolean); // Remove qualquer null do array
-              
+              console.log(response.data.session);
             localStorage.setItem("messages", JSON.stringify(filteredMessages));
-            localStorage.setItem("username", JSON.stringify(username));
+            localStorage.setItem("sessao", JSON.stringify(response.data.session));
           }
           router.push("/chat");
         } else {

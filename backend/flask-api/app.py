@@ -668,6 +668,7 @@ def connect():
 
     except Exception as ex:
         status = "disconnect"
+        
         return jsonify({"status": "error", "message": f"Erro no processamento. {ex}"}), 500
 
 

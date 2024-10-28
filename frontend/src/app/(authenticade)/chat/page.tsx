@@ -34,26 +34,49 @@ import { Avatar, AvatarFallback } from "@radix-ui/react-avatar";
 import { AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Gruppo } from "next/font/google";
-import { group } from "console";
 import { fetchDataPost } from "@/controler/controler";
+
+interface Message {
+  id: number;
+  message: string;
+  timestamp: string;
+  username: string;
+}
+
+interface Session {
+  id_user: string;
+  username: string;
+}
+
+interface Conversa {
+  messages: Message[];
+  session: Session;
+  status: string;
+}
 
 export default function Chat() {
   const [items, setItems] = useState<
     { nome: string; msg: string; url: string }[]
   >([]);
 
+  // Estado para o usuário
+  const [sessao, setSessao] = useState<{ username: string; id_user: string }>();
+
   useEffect(() => {
     const storedMessages = localStorage.getItem("messages");
-    if (storedMessages) {
+    const storedUser = localStorage.getItem("sessao");
+    if (storedMessages && storedUser) {
       setItems(JSON.parse(storedMessages));
+      setSessao(JSON.parse(storedUser));
     }
   }, []);
 
-  // Estado para a conversa atual
-  // const [conversa, setConversa] = useState();
-
-  // Estado para o usuário
-  const [user, setUser] = useState(localStorage.getItem("username"));
+  // Estado para a conversa atual, inicializado corretamente
+  const [conversa, setConversa] = useState<Conversa>({
+    messages: [],
+    session: { id_user: "", username: "" },
+    status: "",
+  });
 
   // Estado para armazenar o valor do input
   const [inputValue, setInputValue] = useState("");
@@ -63,16 +86,18 @@ export default function Chat() {
     e.preventDefault(); // Previne o recarregamento da página ao enviar o formulário
 
     if (inputValue.trim()) {
-      const newMessage = {
-        nome: user,
-        msg: inputValue,
+      const newMessage: Message = {
+        id: Date.now(), // Pode usar um ID único, como um timestamp
+        message: inputValue,
+        timestamp: new Date().toISOString(),
+        username: sessao?.username || "",
       };
 
       // Adiciona a nova mensagem no estado da conversa
-      // setConversa((prevConversa) => ({
-      //   ...prevConversa,
-      //   messages: [...prevConversa.messages, newMessage],
-      // }));
+      setConversa((prevConversa) => ({
+        ...prevConversa,
+        messages: [...prevConversa.messages, newMessage],
+      }));
 
       // Limpa o input
       setInputValue("");
@@ -81,27 +106,36 @@ export default function Chat() {
 
   function iniciaChat(nome: string) {
     // Inicializa os parâmetros como um objeto vazio
-    let params: { name: string; type: string } | undefined;
+    let params:
+      | { name: string; type: string; id_user?: string; username?: string }
+      | undefined;
 
     // Itera sobre os itens para determinar o tipo e o nome
     items.forEach((item) => {
       if (item.nome === nome) {
         params = {
           name: nome,
-          type: item.url === "" ? "topic" : "queue",
+          type: item.url === null ? "TOPIC" : "QUEUE",
+          id_user: sessao?.id_user,
+          username: sessao?.username,
         };
       }
     });
-
+    console.log(params);
     // Verifica se params foi definido antes de fazer a requisição
     if (params) {
       fetchDataPost("/connect", params)
         .then((response) => {
-          // Lide com a resposta da requisição aqui
-          console.log("Chat iniciado com sucesso:", response);
+          setConversa({
+            messages: response?.data?.messages || [],
+            session: {
+              id_user: sessao?.id_user || "",
+              username: sessao?.username || "",
+            },
+            status: response?.data?.status || "", // ajuste conforme necessário
+          });
         })
         .catch((error) => {
-          // Lide com qualquer erro que ocorra na requisição
           console.error("Erro ao iniciar o chat:", error);
         });
     } else {
@@ -168,12 +202,12 @@ export default function Chat() {
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
-      {/* <div className="w-full h-screen flex flex-col">
+      <div className="w-full h-screen flex flex-col">
         <header className="h-[8vh] w-full bg-background p-3 flex items-center border-b">
           <Avatar className="h-10 w-10 flex items-center justify-center dark:bg-slate-600 bg-slate-300 rounded-full">
             <AvatarImage src="" />
             <AvatarFallback className="font-bold">
-              {conversa.dest
+              {conversa.name
                 .split(" ")
                 .slice(0, 2)
                 .map((word) => word[0])
@@ -184,24 +218,30 @@ export default function Chat() {
         </header>
         <main className="bg-muted w-full h-[84vh]">
           <ScrollArea className="w-full h-[84vh] rounded-md border p-4">
-            {conversa.messages.map((item, index) => (
-              <div
-                key={index}
-                className={`flex my-1 ${
-                  item.nome === user.nome ? "justify-end" : "justify-start"
-                }`}
-              >
+            {conversa.messages.length > 0 ? (
+              conversa.messages.map((item) => (
                 <div
-                  className={`p-3 rounded-lg max-w-2xl break-words ${
-                    item.nome === user.nome
-                      ? "dark:bg-slate-600 bg-slate-300"
-                      : "dark:bg-slate-700 bg-slate-200"
+                  key={item.id}
+                  className={`flex my-1 ${
+                    item.username === sessao?.username
+                      ? "justify-end"
+                      : "justify-start"
                   }`}
                 >
-                  <span>{item.msg}</span>
+                  <div
+                    className={`p-3 rounded-lg max-w-2xl break-words ${
+                      item.username === sessao?.username
+                        ? "dark:bg-slate-600 bg-slate-300"
+                        : "dark:bg-slate-700 bg-slate-200"
+                    }`}
+                  >
+                    <span>{item.message}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <div>Nenhuma mensagem para exibir.</div>
+            )}
           </ScrollArea>
         </main>
         <footer className="h-[8vh] w-full bg-background flex flex-row items-center">
@@ -223,7 +263,7 @@ export default function Chat() {
             </button>
           </form>
         </footer>
-      </div> */}
+      </div>
     </SidebarProvider>
   );
 }
