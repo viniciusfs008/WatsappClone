@@ -113,7 +113,7 @@ Este documento contém as instruções para configurar e iniciar o projeto utili
 
 Esses comandos irão iniciar as tarefas definidas no `build.gradle` de cada uma dessas pastas.
 
-### 2 Iniciar Frontend Banco de Dados e API Flask
+### 2 Iniciar Frontend, Banco de Dados e a API Flask
 
 1. Execute o Docker Compose para construir e iniciar os containers da API e do banco de dados:
    ```bash
@@ -124,7 +124,7 @@ Esses comandos irão iniciar as tarefas definidas no `build.gradle` de cada uma 
 
 1. Abra um terminal e navegue até a pasta `banckend/api-flask`:
    ```bash
-   cd api-flask
+   cd backend/api-flask
    ```
 2. Execute o Docker Compose para construir e iniciar os containers da API e do banco de dados:
    ```bash
@@ -132,7 +132,7 @@ Esses comandos irão iniciar as tarefas definidas no `build.gradle` de cada uma 
    ```
 
 Esse comando irá:
-   - Construir os containers definidos no arquivo `docker-compose.yml`.
+   - Construir os containers definidos no arquivo `compose.yml` ou `docker-compose.yaml` em versoes mais antigas do docker.
    - Inicializar o banco de dados `flask_db` e a API Flask `flask_app`.
 
 ### 3. Verificação
