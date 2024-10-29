@@ -1,5 +1,7 @@
 package org.example.models;
 
+
+//Classe mensagem para envio da requisição para API Flask
 public class Message {
 
     private String username;

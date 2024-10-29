@@ -5,7 +5,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 public class SendToApi {
-    // Método para enviar dados para a API Flask
+    // Método para enviar mensagens consumidas para a API Flask
     public static void sendToApi(String username, String message, String apiUrl) {
         try {
             // Criar objeto JSON corretamente formatado
@@ -30,7 +30,6 @@ public class SendToApi {
             // Verificar a resposta
             int responseCode = con.getResponseCode();
             System.out.println("Response Code: " + responseCode);
-            // Aqui você pode processar a resposta da API se necessário
 
         } catch (Exception e) {
             System.out.println("Error sending data to API: " + e.getMessage());

@@ -1,5 +1,7 @@
 package org.example.models;
 
+
+// Classe resposta para a requisição para API Flask
 public class ResponseMessage {
     private String status;
     private String message;

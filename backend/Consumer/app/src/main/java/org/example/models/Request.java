@@ -1,10 +1,16 @@
 package org.example.models;
 
+// classe Resquest com o tipo de requisição e parametros
+// recebidos da API flask
 public class Request {
 
+    // URL da ActiveMQ
     private String brokerUrl;
+    // URL da API Flask
     private String apiUrl;
+    // Nome da Queue ou TOPIC registrada no ActiveMQ
     private String name;
+    // Tipo do destino (QUEUE ou TOPIC)
     private String type;
 
     private String status;
@@ -24,6 +30,7 @@ public class Request {
     }
 
     // Getters e Setters
+    
     public String getBrokerUrl() {
         return brokerUrl;
     }

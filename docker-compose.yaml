@@ -11,35 +11,35 @@ services:
     networks:
       - mynetwork
     
-  # flask_app:
-  #   container_name: flask_app
-  #   image: flask_live_app:1.0.0
-  #   build:
-  #     context: ./backend/flask-api
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "5000:5000"
-  #   environment:
-  #     - DB_URL=postgresql://postgres:postgres@192.168.0.110:5432/postgres
-  #     - HOST_IP=192.168.0.113
-  #   # depends_on:
-  #   #   - flask_db
-  #   networks:
-  #     - mynetwork
+   flask_app:
+     container_name: flask_app
+     image: flask_live_app:1.0.0
+     build:
+       context: ./backend/flask-api
+       dockerfile: Dockerfile
+     ports:
+       - "5000:5000"
+     environment:
+       - DB_URL=postgresql://postgres:postgres@192.168.0.110:5432/postgres
+       - HOST_IP=192.168.0.113
+      depends_on:
+        - flask_db
+     networks:
+       - mynetwork
 
-  # flask_db:
-  #   container_name: flask_db
-  #   image: postgres:13.3-alpine
-  #   ports:
-  #     - "5432:5432"
-  #   environment:
-  #     - POSTGRES_USER=postgres
-  #     - POSTGRES_PASSWORD=postgres
-  #     - POSTGRES_DB=postgres
-  #   volumes:
-  #     - pgdata:/var/lib/postgresql/data
-  #   networks:
-  #     - mynetwork
+   flask_db:
+     container_name: flask_db
+     image: postgres:13.3-alpine
+     ports:
+       - "5432:5432"
+     environment:
+       - POSTGRES_USER=postgres
+       - POSTGRES_PASSWORD=postgres
+       - POSTGRES_DB=postgres
+     volumes:
+       - pgdata:/var/lib/postgresql/data
+     networks:
+       - mynetwork
 
 # criando rede
 networks:

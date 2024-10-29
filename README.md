@@ -96,7 +96,7 @@ Este documento contém as instruções para configurar e iniciar o projeto utili
 
 1. Abra um terminal e navegue até a pasta `Consumer`:
    ```bash
-   cd Consumer
+   cd backend/Consumer
    ```
 2. Execute o projeto utilizando o Gradle:
    ```bash
@@ -104,7 +104,7 @@ Este documento contém as instruções para configurar e iniciar o projeto utili
    ```
 3. Em um novo terminal, navegue até a pasta `JMS_Project`:
    ```bash
-   cd JMS_Project
+   cd d backend/JMS_Project
    ```
 4. Execute o projeto utilizando o Gradle:
    ```bash
@@ -113,15 +113,22 @@ Este documento contém as instruções para configurar e iniciar o projeto utili
 
 Esses comandos irão iniciar as tarefas definidas no `build.gradle` de cada uma dessas pastas.
 
-### 2. Inicializar o Banco de Dados e a API Flask
+### 2 Iniciar Frontend Banco de Dados e API Flask
 
-1. Abra um terminal e navegue até a pasta `api-flask`:
+1. Execute o Docker Compose para construir e iniciar os containers da API e do banco de dados:
+   ```bash
+   docker compose up --build
+   ```
+
+### 3. Inicializar o Banco de Dados e a API Flask separados
+
+1. Abra um terminal e navegue até a pasta `banckend/api-flask`:
    ```bash
    cd api-flask
    ```
 2. Execute o Docker Compose para construir e iniciar os containers da API e do banco de dados:
    ```bash
-   docker-compose up --build
+   docker compose up --build
    ```
 
 Esse comando irá:
@@ -144,8 +151,11 @@ cd ../JMS_Project
 gradle run
 
 # Subir os containers do Docker na pasta api-flask
+cd ../WatappClone
+ou
 cd ../api-flask
-docker-compose up --build
+
+docker compose up --build
 ```
 
 ---

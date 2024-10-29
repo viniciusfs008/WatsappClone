@@ -22,8 +22,7 @@ app = Flask(__name__)
 
 # Configuração para permitir solicitações de qualquer origem
 CORS(app)
-
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 app.config['SECRET_KEY'] = os.urandom(24)
 
 IP = get_local_ip()
@@ -411,9 +410,13 @@ def add_friend():
             return make_response(jsonify({'error': 'Nome de usuário do amigo é necessário.'}), 400)
 
         user_id = session.get('id_user')
+
         friend_username = data['friend_username'].upper()
 
         friend_list = FriendList.query.filter_by(user_id=user_id).first()
+
+        if not friend_list:
+            return make_response(jsonify({'error': 'Erro inesperado sua lista de amigos não foi criada, contate um adiministrador'}), 500)
 
         # Verifica se o amigo existe
         friend = User.query.filter_by(username=friend_username).first()
@@ -447,6 +450,7 @@ def send_message():
 
     session['id_user'] = data['id_user']
     session['username'] = data['username']
+    session['chat'] = data['chat']
 
     # Verifica se o usuário está logado
     if 'id_user' not in session:
@@ -466,6 +470,8 @@ def send_message():
         name = data.get('name')
         msg_content = data.get('message')
         msg_type = data.get('type').upper()
+
+        print(session['chat'])
 
         if 'chat' not in session:
             return jsonify({'error': 'Você não se conectou ao chat ainda!'}), 404
@@ -604,7 +610,6 @@ def connect():
                 )
             ) 
             result = query.first()
-
             
             if not result:
                 return jsonify({"status": "error", "message": "Chat não encontrado."}), 404
@@ -660,7 +665,7 @@ def connect():
         if response.status_code == 200:
             result = [{'id': message.id, 'message': message.message, 'timestamp': message.timestamp, 'username': message.username} for message in messages]
             
-            info = ({'id_user': session['id_user'], 'username': session['username']})
+            info = ({'id_user': session['id_user'], 'username': session['username'], 'chat': name})
             return jsonify({'status': 'success', 'messages': result, "session": info}), 200
         else:
             status = "disconnect"
@@ -789,10 +794,17 @@ def receive_message(value):
 # Evento para quando um cliente entra em uma sala
 @socketio.on('join')
 def handle_join(data):
+    if 'username' not in data:
+        print("Erro: 'username' não fornecido.")
+        return make_response(jsonify({'status': 'error', 'message': "Erro: 'username' não fornecido."}),400)
+    
+
+    if 'room' not in data:
+        print("Erro: 'room' não fornecido.")
+        return make_response(jsonify({'status': 'error', 'message': "Erro: 'room' não fornecido."}),400)
     room = data['room']
     join_room(room)
     print(f'{data["username"]} entrou na sala {room}.')
-
 # Evento para quando um cliente sai da sala
 @socketio.on('leave')
 def handle_leave(data):

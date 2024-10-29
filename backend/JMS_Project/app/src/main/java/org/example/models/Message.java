@@ -2,7 +2,10 @@ package org.example.models;
 
 public class Message {
 
+    // TIPO INTEIRO NÃO UTILIZADO
     private Integer id; // Uso de Integer para permitir valores nulos, se necessário
+    
+    // Atributos obrigatórios (username, message) para representar a mensagem
     private String username;
     private String message;
 
